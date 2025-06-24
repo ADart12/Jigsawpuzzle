@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Jigsaw Puzzle</title>
+  <style>
+    :root {
+      --size: 100px; /* each piece is 100×100 px */
+      --rows: 3;    /* puzzle grid rows    */
+      --cols: 3;    /* puzzle grid columns */
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 2rem 1rem;
+      background: #fafafa;
+    }
+
+    h1 {
+      margin-bottom: 0.5rem;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(var(--cols), var(--size));
+      grid-template-rows: repeat(var(--rows), var(--size));
+      gap: 4px;
+      margin-bottom: 2rem;
+    }
+
+    .slot,
+    .piece {
+      width: var(--size);
+      height: var(--size);
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+    }
+
+    .slot {
+      background: #f3f3f3;
+    }
+
+    .piece {
+      cursor: grab;
+      background-image: url("UDAAN.jpg"); /* replace with your own 300×300 image */
+      background-size: calc(var(--cols) * var(--size))
+        calc(var(--rows) * var(--size));
+      user-select: none;
+    }
+
+    #pieces {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-width: calc(var(--cols) * var(--size));
+      justify-content: center;
+    }
+
+    #win {
+      margin-top: 1rem;
+      padding: 1rem 2rem;
+      border: 2px dashed #2196f3;
+      border-radius: 8px;
+      background: #e3f2fd;
+      font-size: 1.4rem;
+      font-weight: bold;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .letter {
+      color: #2196f3;
+      font-size: 2.4rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Jigsaw Puzzle</h1>
+  <p>Drag the pieces onto the board to complete the picture!</p>
+
+  <!-- Puzzle board (drop zones) -->
+  <div id="board"></div>
+
+  <!-- Scrambled pieces -->
+  <div id="pieces"></div>
+
+  <!-- Letter reveal on success -->
+  <div id="win" class="hidden">
+    Congratulations! Your letter is: <span id="letter" class="letter">I</span>
+  </div>
+
+  <script>
+    // ======== CONFIG ========
+    const ROWS = 3;
+    const COLS = 3;
+    const SIZE = 100; // must match --size in CSS
+    const LETTER = "R"; // change per location
+    // =========================
+
+    const board = document.getElementById("board");
+    const piecesContainer = document.getElementById("pieces");
+    const letterSpan = document.getElementById("letter");
+    letterSpan.textContent = LETTER;
+
+    // Build 3×3 drop‑zone grid
+    function createBoard() {
+      for (let i = 0; i < ROWS * COLS; i++) {
+        const slot = document.createElement("div");
+        slot.className = "slot";
+        slot.dataset.pos = i;
+        slot.addEventListener("dragover", (e) => e.preventDefault());
+        slot.addEventListener("drop", handleDrop);
+        board.appendChild(slot);
+      }
+    }
+
+    // Build draggable pieces in random order
+    function createPieces() {
+      const idx = [...Array(ROWS * COLS).keys()];
+      shuffle(idx);
+      idx.forEach((i) => {
+        const piece = document.createElement("div");
+        piece.className = "piece";
+        piece.draggable = true;
+        piece.dataset.pos = i; // correct position index
+
+        // Set background offset so the large image is sliced logically
+        const x = -(i % COLS) * SIZE;
+        const y = -Math.floor(i / COLS) * SIZE;
+        piece.style.backgroundPosition = `${x}px ${y}px`;
+
+        piece.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", i);
+        });
+        piecesContainer.appendChild(piece);
+      });
+    }
+
+    // Handle drop into a slot
+    function handleDrop(e) {
+      const fromIdx = e.dataTransfer.getData("text/plain");
+      const slot = e.currentTarget;
+
+      // Slot already filled? Do nothing.
+      if (slot.children.length) return;
+
+      const piece = document.querySelector(`.piece[data-pos="${fromIdx}"]`);
+      slot.appendChild(piece);
+      piece.style.cursor = "default";
+
+      checkWin();
+    }
+
+    // Check if every slot has the correct piece
+    function checkWin() {
+      const slots = document.querySelectorAll(".slot");
+      for (const slot of slots) {
+        if (!slot.firstChild || slot.dataset.pos !== slot.firstChild.dataset.pos) {
+          return; // not yet solved
+        }
+      }
+      // All pieces correct! Reveal letter.
+      document.getElementById("win").classList.remove("hidden");
+    }
+
+    // Fisher–Yates shuffle
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    }
+
+    // Initialize puzzle on page load
+    createBoard();
+    createPieces();
+  </script>
+</body>
+</html>
