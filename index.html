@@ -82,8 +82,7 @@
 </head>
 <body>
   <h1>Jigsaw Puzzle</h1>
-  <p>Drag the pieces onto the board to complete the picture!</p>
-
+<p>Tap a piece below, then tap a square above to place it</p>
   <!-- Puzzle board (drop zones) -->
   <div id="board"></div>
 
@@ -92,94 +91,132 @@
 
   <!-- Letter reveal on success -->
   <div id="win" class="hidden">
-    Congratulations! Your letter is: <span id="letter" class="letter">I</span>
+    Congratulations! Your letter is: <span id="letter" class="letter">D</span>
   </div>
 
   <script>
-    // ======== CONFIG ========
-    const ROWS = 3;
-    const COLS = 3;
-    const SIZE = 100; // must match --size in CSS
-    const LETTER = "R"; // change per location
-    // =========================
+  // ======== CONFIG ========
+  const ROWS = 3;
+  const COLS = 3;
+  const SIZE = 100;          // must match --size in CSS
+  const LETTER = "D";        // change per location
+  // =========================
 
-    const board = document.getElementById("board");
-    const piecesContainer = document.getElementById("pieces");
-    const letterSpan = document.getElementById("letter");
-    letterSpan.textContent = LETTER;
+  const board           = document.getElementById("board");
+  const piecesContainer = document.getElementById("pieces");
+  const letterSpan      = document.getElementById("letter");
+  letterSpan.textContent = LETTER;
 
-    // Build 3×3 drop‑zone grid
-    function createBoard() {
-      for (let i = 0; i < ROWS * COLS; i++) {
-        const slot = document.createElement("div");
-        slot.className = "slot";
-        slot.dataset.pos = i;
-        slot.addEventListener("dragover", (e) => e.preventDefault());
-        slot.addEventListener("drop", handleDrop);
-        board.appendChild(slot);
-      }
+  // ---------- build board ----------
+  function createBoard() {
+    for (let i = 0; i < ROWS * COLS; i++) {
+      const slot = document.createElement("div");
+      slot.className  = "slot";
+      slot.dataset.pos = i;
+
+      /* desktop drop */
+      slot.addEventListener("dragover",  e => e.preventDefault());
+      slot.addEventListener("drop",      handleDrop);
+
+      /* mobile tap */
+      slot.addEventListener("click",     handleTapSlot);
+
+      board.appendChild(slot);
     }
+  }
 
-    // Build draggable pieces in random order
-    function createPieces() {
-      const idx = [...Array(ROWS * COLS).keys()];
-      shuffle(idx);
-      idx.forEach((i) => {
-        const piece = document.createElement("div");
-        piece.className = "piece";
-        piece.draggable = true;
-        piece.dataset.pos = i; // correct position index
+  // ---------- build pieces ----------
+  function createPieces() {
+    const idx = [...Array(ROWS * COLS).keys()];
+    shuffle(idx);
+    idx.forEach(i => {
+      const piece = document.createElement("div");
+      piece.className = "piece";
+      piece.draggable = true;
+      piece.dataset.pos = i;
 
-        // Set background offset so the large image is sliced logically
-        const x = -(i % COLS) * SIZE;
-        const y = -Math.floor(i / COLS) * SIZE;
-        piece.style.backgroundPosition = `${x}px ${y}px`;
+      const x = -(i % COLS) * SIZE;
+      const y = -Math.floor(i / COLS) * SIZE;
+      piece.style.backgroundPosition = `${x}px ${y}px`;
 
-        piece.addEventListener("dragstart", (e) => {
-          e.dataTransfer.setData("text/plain", i);
-        });
-        piecesContainer.appendChild(piece);
+      /* desktop drag */
+      piece.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", i);
       });
+
+      /* mobile tap */
+      piece.addEventListener("click", handleTapPiece);
+
+      piecesContainer.appendChild(piece);
+    });
+  }
+
+  // ---------- desktop drop handler ----------
+  function handleDrop(e) {
+    const fromIdx = e.dataTransfer.getData("text/plain");
+    const slot    = e.currentTarget;
+    if (slot.children.length) return;
+
+    const piece = document.querySelector(`.piece[data-pos="${fromIdx}"]`);
+    slot.appendChild(piece);
+    piece.style.cursor = "default";
+    selectedPiece = null;          // clear mobile selection if any
+    checkWin();
+  }
+
+  // ---------- mobile tap‑to‑move ----------
+  let selectedPiece = null;        // currently tapped piece (bottom or on board)
+
+  function handleTapPiece(e) {
+    // First tap: select the piece, second tap on same piece deselects.
+    if (selectedPiece === e.currentTarget) {
+      selectedPiece.classList.remove("selected");
+      selectedPiece = null;
+      return;
     }
 
-    // Handle drop into a slot
-    function handleDrop(e) {
-      const fromIdx = e.dataTransfer.getData("text/plain");
-      const slot = e.currentTarget;
-
-      // Slot already filled? Do nothing.
-      if (slot.children.length) return;
-
-      const piece = document.querySelector(`.piece[data-pos="${fromIdx}"]`);
-      slot.appendChild(piece);
-      piece.style.cursor = "default";
-
-      checkWin();
+    if (selectedPiece) {
+      // Tap on a different piece ⇒ switch selection
+      selectedPiece.classList.remove("selected");
     }
+    selectedPiece = e.currentTarget;
+    selectedPiece.classList.add("selected");
+  }
 
-    // Check if every slot has the correct piece
-    function checkWin() {
-      const slots = document.querySelectorAll(".slot");
-      for (const slot of slots) {
-        if (!slot.firstChild || slot.dataset.pos !== slot.firstChild.dataset.pos) {
-          return; // not yet solved
-        }
+  function handleTapSlot(e) {
+    if (!selectedPiece) return;           // nothing selected
+    const slot = e.currentTarget;
+    if (slot.children.length) return;     // slot already filled
+
+    slot.appendChild(selectedPiece);
+    selectedPiece.classList.remove("selected");
+    selectedPiece.style.cursor = "default";
+    selectedPiece = null;
+    checkWin();
+  }
+
+  // ---------- win check ----------
+  function checkWin() {
+    for (const slot of document.querySelectorAll(".slot")) {
+      if (!slot.firstChild || slot.dataset.pos !== slot.firstChild.dataset.pos) {
+        return;
       }
-      // All pieces correct! Reveal letter.
-      document.getElementById("win").classList.remove("hidden");
     }
+    document.getElementById("win").classList.remove("hidden");
+  }
 
-    // Fisher–Yates shuffle
-    function shuffle(arr) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
+  // ---------- utils ----------
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
     }
+  }
 
-    // Initialize puzzle on page load
-    createBoard();
-    createPieces();
-  </script>
+  // ---------- init ----------
+  createBoard();
+  createPieces();
+</script>
+
 </body>
 </html>
